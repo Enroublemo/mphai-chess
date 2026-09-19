@@ -1,0 +1,8 @@
+// config.js
+window.MPHAI_SUPABASE_URL = 'https://aoxgiesyryalbkhdvler.supabase.co';
+window.MPHAI_SUPABASE_PUBLISHABLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFveGdpZXN5cnlhbGJraGR2bGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2Mjc4MzMsImV4cCI6MjEwNTIwMzgzM30.dfJfzq6qvwYRlAiryIiaWTE2EYX61oIrqfeTFNNd37s';
+
+const supabase = window.supabase.createClient(
+  window.MPHAI_SUPABASE_URL,
+  window.MPHAI_SUPABASE_PUBLISHABLE_KEY
+);

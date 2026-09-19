@@ -1,0 +1,696 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MPHAI Chess Academy — Puzzle Race</title>
+<style>
+
+body{font-family:Arial,sans-serif;margin:0;background:#f4f4f4;color:#222}
+header{background:#222;color:#fff;padding:16px 22px}main{max-width:1050px;margin:20px auto;padding:0 16px}
+.card{background:#fff;border-radius:12px;padding:18px;box-shadow:0 2px 10px #0001;margin-bottom:18px}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input,button{padding:10px 12px;border-radius:8px;border:1px solid #ccc}button{border:0;cursor:pointer;font-weight:600}
+.primary{background:#222;color:#fff}.secondary{background:#ddd}.danger{background:#b3261e;color:#fff}
+.hidden{display:none}.small{font-size:13px;color:#666}.ok{color:#137333;font-weight:bold}.bad{color:#b3261e;font-weight:bold}
+
+.student-link {
+  color: #0066cc;
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: bold;
+}
+.student-link:hover {
+  color: #004499;
+}
+
+#board-wrapper {
+  display: inline-block;
+  background: #3e2723;
+  padding: 10px 12px;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  margin: 15px auto;
+}
+
+.board-files {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  text-align: center;
+  color: #f0d9b5;
+  font-weight: bold;
+  font-size: 14px;
+  margin-left: 22px;
+  margin-right: 22px;
+}
+
+.top-files { margin-bottom: 4px; }
+.bottom-files { margin-top: 4px; }
+
+.board-main-area {
+  display: flex;
+  align-items: center;
+}
+
+.board-ranks {
+  display: grid;
+  grid-template-rows: repeat(8, 1fr);
+  height: min(75vw, 480px);
+  width: 22px;
+  color: #f0d9b5;
+  font-weight: bold;
+  font-size: 14px;
+  align-items: center;
+  text-align: center;
+}
+
+#board {
+  width: min(75vw, 480px);
+  height: min(75vw, 480px);
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  border: 2px solid #2b1d0c;
+}
+
+.square {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(26px, 5.5vw, 46px);
+  user-select: none;
+  cursor: pointer;
+}
+
+.light { background: #f0d9b5; }
+.dark { background: #b58863; }
+
+.selected {
+  outline: 4px solid #f6d200;
+  outline-offset: -4px;
+}
+
+.piece-w {
+  color: #ffffff;
+  filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.8));
+}
+
+.piece-b {
+  color: #111111;
+  filter: drop-shadow(0px 0px 1px #ffffff) drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.6));
+}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.stat{background:#eee;padding:10px;border-radius:8px;text-align:center}
+table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #ddd;text-align:left}
+.notice{padding:10px;border-radius:8px;background:#f0f0f0;margin:10px 0}.topbar{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+
+.promo-modal {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.promo-modal.hidden {
+  display: none !important;
+}
+
+.promo-box {
+  background: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+.promo-box h4 { margin: 0 0 15px 0; font-size: 18px; color: #222; }
+.promo-buttons { display: flex; gap: 10px; }
+.promo-buttons button {
+  font-size: 18px;
+  padding: 10px 15px;
+  background: #3e2723;
+  color: #f0d9b5;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+}
+.promo-buttons button:hover { background: #2b1d0c; }
+
+</style>
+</head>
+<body>
+<header><strong>MPHAI Chess Academy</strong> — Puzzle Race</header>
+<main>
+<section id="authCard" class="card">
+  <h2>Student / Coach Login</h2>
+  <div id="loginForm">
+    <div class="controls">
+      <input id="email" type="email" placeholder="Email" autocomplete="username">
+      <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+      <button class="primary" id="loginBtn">Login</button>
+    </div>
+    <p class="small">Students use their MPHAI account. New student accounts can be registered below.</p>
+    <div class="controls">
+      <input id="signupName" placeholder="Student name">
+      <button class="secondary" id="signupBtn">Create Student Account</button>
+    </div>
+  </div>
+  <div id="userBar" class="hidden topbar">
+    <div>Signed in as <b id="who"></b> <span id="roleBadge"></span></div>
+    <button class="secondary" id="logoutBtn">Logout</button>
+  </div>
+  <div id="authMsg" class="notice"></div>
+</section>
+
+<!-- STUDENT SECTION -->
+<section id="studentApp" class="hidden">
+  <!-- Module Switcher Controls -->
+  <div class="controls" style="margin-bottom: 12px;">
+    <button class="primary" id="modPuzzleRaceBtn">Standard Puzzle Race</button>
+    <button class="secondary" id="modEndgameBtn">Endgame Puzzle Race</button>
+  </div>
+
+  <div class="card">
+    <div class="topbar">
+      <div>
+        <h2 id="moduleTitle">Student Puzzle Race</h2>
+        <div class="small" id="moduleDesc">Everyone follows Puzzle 1 → Puzzle 20. First correct attempt = 3 points; second = 2; third = 1. A wrong third attempt reveals the solution.</div>
+      </div>
+      <button class="primary" id="startBtn">Start</button>
+    </div>
+  </div>
+
+  <div class="card"><div class="stats">
+  <div class="stat">Puzzle<br><b id="num">—</b></div><div class="stat">Correct<br><b id="correct">0</b></div>
+  <div class="stat">Points<br><b id="points">0</b></div><div class="stat">Attempts<br><b id="attempts">0</b></div>
+  </div></div>
+
+  <div class="card">
+  <h3 id="title">Puzzle Race</h3><div id="message">Start a race.</div>
+  <div id="board-wrapper">
+    <div class="board-files top-files">
+      <span>A</span><span>B</span><span>C</span><span>D</span>
+      <span>E</span><span>F</span><span>G</span><span>H</span>
+    </div>
+
+    <div class="board-main-area">
+      <div class="board-ranks">
+        <span>8</span><span>7</span><span>6</span><span>5</span>
+        <span>4</span><span>3</span><span>2</span><span>1</span>
+      </div>
+
+      <div id="board"></div>
+
+      <div class="board-ranks">
+        <span>8</span><span>7</span><span>6</span><span>5</span>
+        <span>4</span><span>3</span><span>2</span><span>1</span>
+      </div>
+    </div>
+
+    <div class="board-files bottom-files">
+      <span>A</span><span>B</span><span>C</span><span>D</span>
+      <span>E</span><span>F</span><span>G</span><span>H</span>
+    </div>
+  </div>
+  <div class="controls"><button class="danger" id="resetPosition">Restart Race</button><button class="primary" id="next" disabled>Next Puzzle</button></div>
+  </div>
+</section>
+
+<!-- COACH DASHBOARD SECTION -->
+<section id="coachApp" class="hidden">
+  <!-- Main Coach Summary View -->
+  <div id="coachMainView" class="card">
+    <h2>MPHAI Coach Dashboard</h2>
+    <p>Coach view of student accounts and cumulative module performance (Live updates active). Click a student's name to view module breakdown.</p>
+    <table>
+      <thead>
+        <tr><th>Student</th><th>Total Correct</th><th>Total Points</th><th>Attempts</th></tr>
+      </thead>
+      <tbody id="coachTable"></tbody>
+    </table>
+  </div>
+
+  <!-- Student Breakdown Detail View -->
+  <div id="coachDetailView" class="card hidden">
+    <div class="topbar">
+      <h2>Student Progress Breakdown</h2>
+      <button class="secondary" id="backToCoachBtn">← Back to Dashboard</button>
+    </div>
+    <p>Showing module scores for: <b id="detailStudentName"></b></p>
+    <table>
+      <thead>
+        <tr><th>Module Name</th><th>Correct</th><th>Points</th><th>Attempts</th></tr>
+      </thead>
+      <tbody id="detailTable"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- LEADERBOARD SECTION -->
+<section id="leaderboardCard" class="card">
+  <div class="topbar">
+    <h3>Leaderboard</h3>
+    <span class="small ok">● Live Updates Active</span>
+  </div>
+  <table>
+    <thead>
+      <tr><th>Student</th><th>Correct</th><th>Points</th><th>Attempts</th></tr>
+    </thead>
+    <tbody id="leaderboard"></tbody>
+  </table>
+  <p class="small">Leaderboard updates automatically in real-time as students solve puzzles.</p>
+</section>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script>
+var supabase = window.supabase.createClient(window.MPHAI_SUPABASE_URL, window.MPHAI_SUPABASE_PUBLISHABLE_KEY);
+window.supabaseClient = supabase;
+
+const pieceSVGs = {
+  w: {
+    p: 'https://lichess1.org/assets/piece/cburnett/wP.svg',
+    n: 'https://lichess1.org/assets/piece/cburnett/wN.svg',
+    b: 'https://lichess1.org/assets/piece/cburnett/wB.svg',
+    r: 'https://lichess1.org/assets/piece/cburnett/wR.svg',
+    q: 'https://lichess1.org/assets/piece/cburnett/wQ.svg',
+    k: 'https://lichess1.org/assets/piece/cburnett/wK.svg'
+  },
+  b: {
+    p: 'https://lichess1.org/assets/piece/cburnett/bP.svg',
+    n: 'https://lichess1.org/assets/piece/cburnett/bN.svg',
+    b: 'https://lichess1.org/assets/piece/cburnett/bB.svg',
+    r: 'https://lichess1.org/assets/piece/cburnett/bR.svg',
+    q: 'https://lichess1.org/assets/piece/cburnett/bQ.svg',
+    k: 'https://lichess1.org/assets/piece/cburnett/bK.svg'
+  }
+};
+
+let currentModule = 'puzzle_race';
+let user=null, profile=null, puzzles=[], raceId=null, idx=0, game=null, selected=null, tries=0, correct=0, points=0, totalAttempts=0, raceFinished=false, puzzleCompleted=false;
+let leaderboardChannel = null;
+
+const $=id=>document.getElementById(id);
+function msg(t,cls=''){ $('authMsg').textContent=t; $('authMsg').className='notice '+cls; }
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
+
+async function init(){
+  if(window.MPHAI_SUPABASE_URL.includes('YOUR-PROJECT')){msg('Configure config.js first. Copy config.example.js to config.js and add your Supabase URL and Publishable Key.','bad');return;}
+  const {data:{session}}=await supabase.auth.getSession();
+  if(session) await signedIn(session.user); else msg('Please log in.');
+  supabase.auth.onAuthStateChange(async (_event,session)=>{if(session) await signedIn(session.user); else signedOut();});
+}
+
+async function signedIn(u){
+  user=u;
+  const {data:p,error}=await supabase.from('profiles').select('*').eq('id',u.id).single();
+  if(error){msg(error.message,'bad');return;} profile=p;
+  $('loginForm').classList.add('hidden');$('userBar').classList.remove('hidden');$('who').textContent=p.full_name;
+  $('roleBadge').textContent=p.role==='coach'?'(COACH)':'(STUDENT)';$('authMsg').textContent='';
+  
+  setupRealtimeLeaderboard();
+
+  if(p.role==='student'){ 
+    $('studentApp').classList.remove('hidden');$('coachApp').classList.add('hidden'); 
+    await switchModule('puzzle_race');
+    await refreshLeaderboard(); 
+  } else { 
+    $('studentApp').classList.add('hidden');$('coachApp').classList.remove('hidden'); 
+    closeStudentDetail();
+    await refreshLeaderboard(); 
+    await loadCoach();
+  }
+}
+
+function signedOut(){
+  unsubscribeRealtimeLeaderboard();
+  user=null;profile=null;raceId=null;
+  $('loginForm').classList.remove('hidden');$('userBar').classList.add('hidden');
+  $('studentApp').classList.add('hidden');$('coachApp').classList.add('hidden');
+  msg('Signed out.');
+}
+
+function setupRealtimeLeaderboard() {
+  if (leaderboardChannel) return;
+
+  leaderboardChannel = supabase
+    .channel('public:puzzle_attempts')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'puzzle_attempts' },
+      async () => {
+        await refreshLeaderboard();
+        if (profile && profile.role === 'coach') {
+          await loadCoach();
+        }
+      }
+    )
+    .subscribe();
+}
+
+function unsubscribeRealtimeLeaderboard() {
+  if (leaderboardChannel) {
+    supabase.removeChannel(leaderboardChannel);
+    leaderboardChannel = null;
+  }
+}
+
+$('loginBtn').onclick=async()=>{
+ const {error}=await supabase.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});
+ if(error) msg(error.message,'bad');
+};
+
+$('signupBtn').onclick=async()=>{
+ const name=$('signupName').value.trim(),email=$('email').value.trim(),password=$('password').value;
+ if(!name||!email||password.length<6){msg('Enter name, email and a password of at least 6 characters.','bad');return;}
+ const {data,error}=await supabase.auth.signUp({email,password,options:{data:{full_name:name}}});
+ if(error) msg(error.message,'bad'); else msg(data.session?'Account created and signed in.':'Account created. Check the confirmation email if email confirmation is enabled.');
+};
+
+$('logoutBtn').onclick=()=>supabase.auth.signOut();
+
+async function switchModule(moduleType) {
+  currentModule = moduleType;
+  
+  if (moduleType === 'puzzle_race') {
+    $('modPuzzleRaceBtn').className = 'primary';$('modEndgameBtn').className = 'secondary';
+    $('moduleTitle').textContent = 'Student Puzzle Race';$('moduleDesc').textContent = 'Everyone follows Puzzle 1 → Puzzle 20. First correct attempt = 3 points; second = 2; third = 1. A wrong third attempt reveals the solution.';
+  } else {
+    $('modPuzzleRaceBtn').className = 'secondary';$('modEndgameBtn').className = 'primary';
+    $('moduleTitle').textContent = 'Endgame Puzzle Race (Testing Mode)';$('moduleDesc').textContent = 'Practice essential endgame positions. (Currently testing leaderboard scoring using standard puzzle set).';
+  }
+
+  await loadPuzzles(currentModule);
+  await resumeOrCreateRace(currentModule);
+}
+
+$('modPuzzleRaceBtn').onclick = () => switchModule('puzzle_race');$('modEndgameBtn').onclick = () => switchModule('endgame_solving');
+
+async function loadPuzzles(moduleType = 'puzzle_race'){
+ const {data,error}=await supabase.rpc('get_puzzle_race_puzzles', { p_module_type: moduleType });
+ if(error){$('message').textContent=error.message; return;} 
+ puzzles=data||[];
+
+ if (puzzles.length === 0 && moduleType === 'endgame_solving') {
+   const fallback = await supabase.rpc('get_puzzle_race_puzzles', { p_module_type: 'puzzle_race' });
+   puzzles = fallback.data || [];
+ }
+}
+
+async function startRace(moduleType = 'puzzle_race'){
+ if(!puzzles.length) await loadPuzzles(moduleType);
+ const {data,error}=await supabase.rpc('start_race', { p_module_type: moduleType });
+ if(error){$('message').textContent=error.message;return;}
+ raceId=data;idx=0;correct=0;points=0;totalAttempts=0;raceFinished=false;loadPuzzle();
+}
+
+async function resumeOrCreateRace(moduleType = 'puzzle_race') {
+  if (!puzzles.length) await loadPuzzles(moduleType);
+
+  if (!puzzles.length) {
+    $('message').textContent = 'No puzzles available for this module yet.';$('num').textContent = '—';
+    return;
+  }
+
+  const { data: activeRaces, error: rErr } = await supabase
+    .from('race_sessions')
+    .select('id')
+    .eq('student_id', user.id)
+    .eq('module_type', moduleType)
+    .is('completed_at', null)
+    .order('started_at', { ascending: false })
+    .limit(1);
+
+  if (rErr || !activeRaces || activeRaces.length === 0) {
+    await startRace(moduleType);
+    return;
+  }
+
+  raceId = activeRaces[0].id;
+
+  const { data: attempts, error: aErr } = await supabase
+    .from('puzzle_attempts')
+    .select('*')
+    .eq('race_id', raceId);
+
+  if (aErr) { $('message').textContent = aErr.message; return; }
+
+  points = 0; correct = 0; totalAttempts = attempts ? attempts.length : 0; raceFinished = false;
+  const attemptsByPuzzle = {};
+
+  (attempts || []).forEach(a => {
+    points += a.points;
+    if (a.is_correct) correct++;
+    if (!attemptsByPuzzle[a.puzzle_id]) attemptsByPuzzle[a.puzzle_id] = [];
+    attemptsByPuzzle[a.puzzle_id].push(a);
+  });
+
+  let currentIdx = -1;
+  for (let i = 0; i < puzzles.length; i++) {
+    const pId = puzzles[i].id;
+    const pAttempts = attemptsByPuzzle[pId] || [];
+    const isSolved = pAttempts.some(a => a.is_correct);
+    const isExhausted = pAttempts.length >= 3;
+
+    if (!isSolved && !isExhausted) {
+      currentIdx = i;
+      break;
+    }
+  }
+
+  if (currentIdx === -1) {
+    await supabase.rpc('complete_race', { p_race_id: raceId });
+    raceFinished = true;
+    $('message').innerHTML = `<span class="ok">Race complete!</span> Correct: ${correct}/${puzzles.length}, Points: ${points}`;
+    $('next').disabled = true;
+    updateStats();
+    await refreshLeaderboard();
+    return;
+  }
+
+  idx = currentIdx;
+  loadPuzzle();
+
+  const currentPuzzleAttempts = attemptsByPuzzle[puzzles[idx].id] || [];
+  tries = currentPuzzleAttempts.length;
+  if (tries > 0) {
+    $('message').textContent = `Resumed race at Puzzle ${idx + 1}. Attempt ${tries} of 3 used.`;
+  }
+}
+
+$('startBtn').onclick = () => startRace(currentModule);
+
+function loadPuzzle(){
+  tries=0; selected=null; puzzleCompleted=false; game=new Chess(puzzles[idx].fen);
+  $('num').textContent=`${idx+1} / ${puzzles.length}`; $('title').textContent=`Puzzle ${idx+1}`;
+  $('message').textContent='Find the best move.';$('next').disabled=true; render(); updateStats();
+}
+
+function render(){
+  const b=$('board'); b.innerHTML=''; const board=game.board();
+  for(let r=0; r<8; r++) {
+    for(let c=0; c<8; c++) {
+      const s=document.createElement('div');
+      s.className='square '+((r+c)%2?'dark':'light');
+      const piece=board[r][c];
+      if(piece) {
+        const img = document.createElement('img');
+        img.src = pieceSVGs[piece.color][piece.type];
+        img.style.width = '85%';
+        img.style.height = '85%';
+        img.style.pointerEvents = 'none';
+        s.appendChild(img);
+      }
+      s.dataset.square=String.fromCharCode(97+c)+(8-r);
+      if(selected===s.dataset.square) s.classList.add('selected');
+      s.onclick=()=>clickSquare(s.dataset.square);
+      b.appendChild(s);
+    }
+  }
+}
+
+let promoResolver = null;
+
+function getPromotionChoice() {
+  $('promoModal').classList.remove('hidden');
+  return new Promise((resolve) => {
+    promoResolver = resolve;
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('#promoModal .promo-buttons button').forEach(btn => {
+    btn.onclick = (e) => {
+      const piece = e.target.getAttribute('data-piece') || 'q';
+      $('promoModal').classList.add('hidden');
+      if (promoResolver) {
+        const resolve = promoResolver;
+        promoResolver = null;
+        resolve(piece);
+      }
+    };
+  });
+});
+
+async function clickSquare(sq) {
+  if (!raceId || raceFinished || puzzleCompleted) return;
+  const piece = game.get(sq);
+
+  if (selected) {
+    const movingPiece = game.get(selected);
+
+    const isWhitePromo = movingPiece && movingPiece.type === 'p' && movingPiece.color === 'w' && sq[1] === '8';
+    const isBlackPromo = movingPiece && movingPiece.type === 'p' && movingPiece.color === 'b' && sq[1] === '1';
+    const isPromotion = isWhitePromo || isBlackPromo;
+
+    let promoPiece = 'q';
+
+    if (isPromotion) {
+      const legalMoves = game.moves({ square: selected, verbose: true });
+      const isLegal = legalMoves.some(m => m.to === sq);
+
+      if (!isLegal) {
+        selected = null;
+        render();
+        return;
+      }
+
+      promoPiece = await getPromotionChoice();
+    }
+
+    const move = game.move({ from: selected, to: sq, promotion: promoPiece });
+    if (!move) {
+      selected = null;
+      render();
+      if (piece && piece.color === game.turn()) {
+        selected = sq;
+        render();
+      }
+      return;
+    }
+
+    const san = move.san;
+    game.undo();
+    selected = null;
+    render();
+    await submitAttempt(san);
+
+  } else if (piece && piece.color === game.turn()) {
+    selected = sq;
+    render();
+  }
+}
+
+async function submitAttempt(san){
+  $('message').textContent='Checking result…';
+  const {data,error}=await supabase.rpc('submit_puzzle_attempt',{p_race_id:raceId,p_puzzle_id:puzzles[idx].id,p_answer_san:san});
+  if(error){$('message').innerHTML='<span class="bad">Error:</span> '+escapeHtml(error.message);return;}
+  const r=data[0]; tries=r.attempt_no; totalAttempts++; points+=r.points_awarded; if(r.is_correct) correct++;
+
+  if(r.is_correct){
+    puzzleCompleted = true;
+    $('message').innerHTML=`<span class="ok">✓ Correct!</span> You earned ${r.points_awarded} point${r.points_awarded===1?'':'s'}. Click <b>Next Puzzle</b> to continue.`;
+    $('next').disabled=false;
+  } else if(r.attempts_used<3){
+    $('message').innerHTML=`<span class="bad">✗ Not quite.</span> Try again. Attempt ${r.attempts_used} of 3.`;
+  } else {
+    puzzleCompleted = true;
+    $('message').innerHTML=`<span class="bad">✗ Three attempts used.</span> Solution: <b>${escapeHtml(r.solution_san||'')}</b>. Click <b>Next Puzzle</b> to continue.`;
+    $('next').disabled=false;
+  }
+  updateStats();
+  await refreshLeaderboard();
+}
+
+$('next').onclick=async()=>{
+ if(idx<puzzles.length-1){idx++;loadPuzzle();}
+ else{
+   await supabase.rpc('complete_race',{p_race_id:raceId});raceFinished=true;
+   $('message').innerHTML=`<span class="ok">Race complete!</span> Correct: ${correct}/${puzzles.length}, Points: ${points}`;
+   $('next').disabled=true;await refreshLeaderboard();
+ }
+};
+
+$('resetPosition').onclick = async () => {
+  const confirmed = confirm("Are you sure you want to restart? Your current points and progress for this module will be reset to 0, and you will start back at Puzzle 1.");
+  if (confirmed) {
+    await startRace(currentModule);
+  }
+};
+
+function updateStats(){$('correct').textContent=correct;$('points').textContent=points;$('attempts').textContent=totalAttempts;}
+
+async function refreshLeaderboard(){
+ const {data,error}=await supabase.rpc('get_global_leaderboard');
+ if(error){$('leaderboard').innerHTML=`<tr><td colspan="4">${escapeHtml(error.message)}</td></tr>`;return;}
+ $('leaderboard').innerHTML=(data||[]).map(v=>`<tr><td>${escapeHtml(v.full_name)}</td><td>${v.correct}</td><td><b>${v.points}</b></td><td>${v.attempts}</td></tr>`).join('')||'<tr><td colspan="4">No completed races yet.</td></tr>';
+}
+
+async function loadCoach(){
+ const {data,error}=await supabase.rpc('get_global_leaderboard');
+ if(error){$('coachTable').innerHTML=`<tr><td colspan="4">${escapeHtml(error.message)}</td></tr>`;return;}
+ $('coachTable').innerHTML=(data||[]).map(v=>{
+   const studentId = v.id || v.student_id;
+   return `<tr>
+     <td><span class="student-link" onclick="viewStudentDetail('${studentId}', '${escapeHtml(v.full_name)}')">${escapeHtml(v.full_name)}</span></td>
+     <td>${v.correct}</td>
+     <td><b>${v.points}</b></td>
+     <td>${v.attempts}</td>
+   </tr>`;
+ }).join('');
+}
+
+async function viewStudentDetail(studentId, studentName) {
+  $('coachMainView').classList.add('hidden');
+  $('coachDetailView').classList.remove('hidden');$('detailStudentName').textContent = studentName;
+  $('detailTable').innerHTML = '<tr><td colspan="4">Loading breakdown...</td></tr>';
+
+  const { data, error } = await supabase.rpc('get_student_module_breakdown', { p_student_id: studentId });
+
+  if (error) {
+    $('detailTable').innerHTML = `<tr><td colspan="4" class="bad">${escapeHtml(error.message)}</td></tr>`;
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    $('detailTable').innerHTML = '<tr><td colspan="4">No module activity recorded yet.</td></tr>';
+    return;
+  }
+
+  $('detailTable').innerHTML = data.map(m => `
+    <tr>
+      <td><b>${escapeHtml(m.module_name)}</b></td>
+      <td>${m.correct}</td>
+      <td><b>${m.points}</b></td>
+      <td>${m.attempts}</td>
+    </tr>
+  `).join('');
+}
+
+function closeStudentDetail() {
+  $('coachDetailView').classList.add('hidden');$('coachMainView').classList.remove('hidden');
+}
+
+$('backToCoachBtn').onclick = closeStudentDetail;
+
+init();
+</script>
+
+<div id="promoModal" class="promo-modal hidden">
+  <div class="promo-box">
+    <h4>Promote Pawn To:</h4>
+    <div class="promo-buttons">
+      <button data-piece="q">♛ Queen</button>
+      <button data-piece="r">♜ Rook</button>
+      <button data-piece="b">♝ Bishop</button>
+      <button data-piece="n">♞ Knight</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
