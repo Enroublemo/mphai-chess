@@ -103,4 +103,3 @@ The current puzzle checker compares normalized SAN against the stored solution. 
 
 For a later hardened competition version, the move legality and complete game-state validation can also be moved server-side.
 
-Test for Commit History

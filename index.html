@@ -9,7 +9,9 @@ body{font-family:Arial,sans-serif;margin:0;background:#f4f4f4;color:#222}
 header{background:#222;color:#fff;padding:16px 22px}main{max-width:1050px;margin:20px auto;padding:0 16px}
 .card{background:#fff;border-radius:12px;padding:18px;box-shadow:0 2px 10px #0001;margin-bottom:18px}
 .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-input,button{padding:10px 12px;border-radius:8px;border:1px solid #ccc}button{border:0;cursor:pointer;font-weight:600}
+input,button,select{padding:10px 12px;border-radius:8px;border:1px solid #ccc}
+button{border:0;cursor:pointer;font-weight:600}
+select{cursor:pointer;font-weight:600;background:#fff}
 .primary{background:#222;color:#fff}.secondary{background:#ddd}.danger{background:#b3261e;color:#fff}
 .hidden{display:none}.small{font-size:13px;color:#666}.ok{color:#137333;font-weight:bold}.bad{color:#b3261e;font-weight:bold}
 
@@ -166,10 +168,25 @@ table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px so
 
 <!-- STUDENT SECTION -->
 <section id="studentApp" class="hidden">
-  <!-- Module Switcher Controls -->
-  <div class="controls" style="margin-bottom: 12px;">
-    <button class="primary" id="modPuzzleRaceBtn">Standard Puzzle Race</button>
-    <button class="secondary" id="modEndgameBtn">Endgame Puzzle Race</button>
+  <!-- Cascading Category Dropdowns -->
+  <div class="controls" style="margin-bottom: 14px; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 6px;">
+      <label for="mainCategorySelect" style="font-weight: bold; font-size: 14px;">Category:</label>
+      <select id="mainCategorySelect">
+        <option value="Puzzle">Puzzle</option>
+        <option value="Opening">Opening</option>
+        <option value="Tactics">Tactics</option>
+        <option value="Strategy">Strategy</option>
+        <option value="Endgame">Endgame</option>
+      </select>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 6px;">
+      <label for="subCategorySelect" style="font-weight: bold; font-size: 14px;">Section:</label>
+      <select id="subCategorySelect">
+        <!-- Dynamically populated by JavaScript -->
+      </select>
+    </div>
   </div>
 
   <div class="card">
@@ -291,6 +308,30 @@ const pieceSVGs = {
   }
 };
 
+// Category and Section Metadata Map
+const CATEGORY_MAP = {
+  Puzzle: [
+    { id: 'puzzle_race', name: 'Standard Puzzle Race', desc: 'Everyone follows Puzzle 1 → Puzzle 20. First correct attempt = 3 points; second = 2; third = 1. A wrong third attempt reveals the solution.' },
+    { id: 'endgame_solving', name: 'Endgame Puzzle Race', desc: 'Practice essential endgame positions.' }
+  ],
+  Opening: [
+    { id: 'opening_explorer', name: 'Opening Explorer', desc: 'Explore common chess opening lines and principles.' },
+    { id: 'opening_repertoire', name: 'Repertoire Builder', desc: 'Build and memorize your custom repertoire.' }
+  ],
+  Tactics: [
+    { id: 'pins_forks', name: 'Pins & Forks', desc: 'Master tactical opportunities involving pins, skewers, and forks.' },
+    { id: 'discovered_attacks', name: 'Discovered Attacks', desc: 'Practice discovered checks and double attacks.' }
+  ],
+  Strategy: [
+    { id: 'pawn_structure', name: 'Pawn Structure', desc: 'Understand pawn chains, weak squares, and passed pawns.' },
+    { id: 'positional_play', name: 'Positional Play', desc: 'Learn long-term strategic plans and piece placement.' }
+  ],
+  Endgame: [
+    { id: 'rook_endgames', name: 'Rook Endgames', desc: 'Master critical Lucena and Philidor Rook endgames.' },
+    { id: 'pawn_endgames', name: 'Pawn Endgames', desc: 'Learn key calculation techniques for pawn races.' }
+  ]
+};
+
 let currentModule = 'puzzle_race';
 let user=null, profile=null, puzzles=[], raceId=null, idx=0, game=null, selected=null, tries=0, correct=0, points=0, totalAttempts=0, raceFinished=false, puzzleCompleted=false;
 let leaderboardChannel = null;
@@ -317,7 +358,7 @@ async function signedIn(u){
 
   if(p.role==='student'){ 
     $('studentApp').classList.remove('hidden');$('coachApp').classList.add('hidden'); 
-    await switchModule('puzzle_race');
+    await loadUserLastVisited();
     await refreshLeaderboard(); 
   } else { 
     $('studentApp').classList.add('hidden');$('coachApp').classList.remove('hidden'); 
@@ -374,29 +415,114 @@ $('signupBtn').onclick=async()=>{
 
 $('logoutBtn').onclick=()=>supabase.auth.signOut();
 
-async function switchModule(moduleType) {
-  currentModule = moduleType;
+// --- DROPDOWN & NAVIGATION PERSISTENCE LOGIC ---
+
+function populateSubcategories(mainCat, selectedSubId = null) {
+  const subSelect = $('subCategorySelect');
+  subSelect.innerHTML = '';
+  const options = CATEGORY_MAP[mainCat] || [];
   
-  if (moduleType === 'puzzle_race') {
-    $('modPuzzleRaceBtn').className = 'primary';$('modEndgameBtn').className = 'secondary';
-    $('moduleTitle').textContent = 'Student Puzzle Race';$('moduleDesc').textContent = 'Everyone follows Puzzle 1 → Puzzle 20. First correct attempt = 3 points; second = 2; third = 1. A wrong third attempt reveals the solution.';
+  options.forEach(item => {
+    const opt = document.createElement('option');
+    opt.value = item.id;
+    opt.textContent = item.name;
+    subSelect.appendChild(opt);
+  });
+
+  if (selectedSubId && options.some(x => x.id === selectedSubId)) {
+    subSelect.value = selectedSubId;
+  } else if (options.length > 0) {
+    subSelect.value = options[0].id;
+  }
+}
+
+async function saveUserLastVisited(category, subcategory) {
+  localStorage.setItem('mphai_last_cat', category);
+  localStorage.setItem('mphai_last_subcat', subcategory);
+
+  if (user) {
+    try {
+      await supabase.from('user_progress').upsert({
+        user_id: user.id,
+        last_category: category,
+        last_subcategory: subcategory,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+    } catch(e) {
+      console.warn('Could not save progress state to Supabase:', e);
+    }
+  }
+}
+
+async function loadUserLastVisited() {
+  let cat = 'Puzzle';
+  let subcat = 'puzzle_race';
+
+  if (user) {
+    const { data } = await supabase
+      .from('user_progress')
+      .select('last_category, last_subcategory')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (data) {
+      cat = data.last_category && CATEGORY_MAP[data.last_category] ? data.last_category : cat;
+      subcat = data.last_subcategory || subcat;
+    } else {
+      cat = localStorage.getItem('mphai_last_cat') || cat;
+      subcat = localStorage.getItem('mphai_last_subcat') || subcat;
+    }
   } else {
-    $('modPuzzleRaceBtn').className = 'secondary';$('modEndgameBtn').className = 'primary';
-    $('moduleTitle').textContent = 'Endgame Puzzle Race (Testing Mode)';$('moduleDesc').textContent = 'Practice essential endgame positions. (Currently testing leaderboard scoring using standard puzzle set).';
+    cat = localStorage.getItem('mphai_last_cat') || cat;
+    subcat = localStorage.getItem('mphai_last_subcat') || subcat;
   }
 
+  $('mainCategorySelect').value = cat;
+  populateSubcategories(cat, subcat);
+  const activeSub = $('subCategorySelect').value;
+  await switchModule(cat, activeSub);
+}
+
+async function switchModule(mainCategory, subCategory) {
+  currentModule = subCategory;
+
+  let foundItem = (CATEGORY_MAP[mainCategory] || []).find(x => x.id === subCategory);
+  if (!foundItem) {
+    for (const c in CATEGORY_MAP) {
+      const item = CATEGORY_MAP[c].find(x => x.id === subCategory);
+      if (item) { foundItem = item; break; }
+    }
+  }
+
+  $('moduleTitle').textContent = foundItem ? foundItem.name : 'Student Puzzle Race';
+  $('moduleDesc').textContent = foundItem ? foundItem.desc : 'Practice chess puzzles.';
+
+  await saveUserLastVisited(mainCategory, subCategory);
   await loadPuzzles(currentModule);
   await resumeOrCreateRace(currentModule);
 }
 
-$('modPuzzleRaceBtn').onclick = () => switchModule('puzzle_race');$('modEndgameBtn').onclick = () => switchModule('endgame_solving');
+$('mainCategorySelect').onchange = async (e) => {
+  const cat = e.target.value;
+  populateSubcategories(cat);
+  const subcat = $('subCategorySelect').value;
+  await switchModule(cat, subcat);
+};
+
+$('subCategorySelect').onchange = async (e) => {
+  const cat = $('mainCategorySelect').value;
+  const subcat = e.target.value;
+  await switchModule(cat, subcat);
+};
+
+// --- PUZZLE RACE ENGINE & SUPABASE RPCs ---
 
 async function loadPuzzles(moduleType = 'puzzle_race'){
  const {data,error}=await supabase.rpc('get_puzzle_race_puzzles', { p_module_type: moduleType });
  if(error){$('message').textContent=error.message; return;} 
  puzzles=data||[];
 
- if (puzzles.length === 0 && moduleType === 'endgame_solving') {
+ if (puzzles.length === 0 && moduleType !== 'puzzle_race') {
    const fallback = await supabase.rpc('get_puzzle_race_puzzles', { p_module_type: 'puzzle_race' });
    puzzles = fallback.data || [];
  }
