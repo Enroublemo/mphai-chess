@@ -310,8 +310,8 @@ const pieceSVGs = {
 
 // Category and Section Metadata Map
 const CATEGORY_MAP = {
-  Puzzle: [
-    { id: 'puzzle_race', name: 'Standard Puzzle Race', desc: 'Everyone follows Puzzle 1 → Puzzle 20. First correct attempt = 3 points; second = 2; third = 1. A wrong third attempt reveals the solution.' },
+   Puzzle: [
+    { id: 'mate_in1', name: 'Mate in 1', desc: 'Everyone follows Puzzle 1 → Puzzle 20. First correct attempt = 3 points; second = 2; third = 1. A wrong third attempt reveals the solution.' },
     { id: 'endgame_solving', name: 'Endgame Puzzle Race', desc: 'Practice essential endgame positions.' }
   ],
   Opening: [
@@ -332,7 +332,7 @@ const CATEGORY_MAP = {
   ]
 };
 
-let currentModule = 'puzzle_race';
+let currentModule = 'mate_in1';
 let user=null, profile=null, puzzles=[], raceId=null, idx=0, game=null, selected=null, tries=0, correct=0, points=0, totalAttempts=0, raceFinished=false, puzzleCompleted=false;
 let leaderboardChannel = null;
 
@@ -456,7 +456,7 @@ async function saveUserLastVisited(category, subcategory) {
 
 async function loadUserLastVisited() {
   let cat = 'Puzzle';
-  let subcat = 'puzzle_race';
+  let subcat = 'mate_in1';
 
   if (user) {
     const { data } = await supabase
@@ -517,25 +517,25 @@ $('subCategorySelect').onchange = async (e) => {
 
 // --- PUZZLE RACE ENGINE & SUPABASE RPCs ---
 
-async function loadPuzzles(moduleType = 'puzzle_race'){
+async function loadPuzzles(moduleType = 'mate_in1'){
  const {data,error}=await supabase.rpc('get_puzzle_race_puzzles', { p_module_type: moduleType });
  if(error){$('message').textContent=error.message; return;} 
  puzzles=data||[];
 
- if (puzzles.length === 0 && moduleType !== 'puzzle_race') {
-   const fallback = await supabase.rpc('get_puzzle_race_puzzles', { p_module_type: 'puzzle_race' });
+ if (puzzles.length === 0 && moduleType !== 'mate_in1') {
+   const fallback = await supabase.rpc('get_puzzle_race_puzzles', { p_module_type: 'mate_in1' });
    puzzles = fallback.data || [];
  }
 }
 
-async function startRace(moduleType = 'puzzle_race'){
+async function startRace(moduleType = 'mate_in1'){
  if(!puzzles.length) await loadPuzzles(moduleType);
  const {data,error}=await supabase.rpc('start_race', { p_module_type: moduleType });
  if(error){$('message').textContent=error.message;return;}
  raceId=data;idx=0;correct=0;points=0;totalAttempts=0;raceFinished=false;loadPuzzle();
 }
 
-async function resumeOrCreateRace(moduleType = 'puzzle_race') {
+async function resumeOrCreateRace(moduleType = 'mate_in1'){
   if (!puzzles.length) await loadPuzzles(moduleType);
 
   if (!puzzles.length) {
