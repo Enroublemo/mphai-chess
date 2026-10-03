@@ -101,9 +101,38 @@ select{cursor:pointer;font-weight:600;background:#fff}
   filter: drop-shadow(0px 0px 1px #ffffff) drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.6));
 }
 
+/* Auth Tab Navigation Styling */
+.auth-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 2px solid #eee;
+  margin-bottom: 16px;
+}
+
+.tab-btn {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  font-weight: bold;
+  color: #666;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  margin-bottom: -2px;
+}
+
+.tab-btn.active {
+  color: #222;
+  border-bottom-color: #222;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.stat{background:#eee;padding:10px;border-radius:8px;text-align:center}
-table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #ddd;text-align:left}
-.notice{padding:10px;border-radius:8px;background:#f0f0f0;margin:10px 0}.topbar{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
 
 .promo-modal {
   position: fixed;
@@ -146,21 +175,37 @@ table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px so
 <header><strong>MPHAI Chess Academy</strong> — Puzzle Race</header>
 <main>
 <section id="authCard" class="card">
-  <h2>Student / Coach Login</h2>
-  <div id="loginForm">
-    <div class="controls">
-      <input id="loginIdentifier" type="text" placeholder="Email or User ID" autocomplete="username">
-      <input id="password" type="password" placeholder="Password" autocomplete="current-password">
-      <button class="primary" id="loginBtn">Login</button>
+  <div id="authFormContainer">
+    <!-- Auth Tab Bar -->
+    <div class="auth-tabs">
+      <button class="tab-btn active" id="tabLogin" onclick="switchAuthTab('login')">Sign In</button>
+      <button class="tab-btn" id="tabSignup" onclick="switchAuthTab('signup')">Create Student Account</button>
     </div>
-    <p class="small">Students use their MPHAI account. New student accounts can be registered below.</p>
- <div class="controls">
-  <input id="signupName" placeholder="Student name">
-  <input id="signupUsername" placeholder="User ID / Username">
-  <input id="signupEmail" type="email" placeholder="Email address">
-  <button class="secondary" id="signupBtn">Create Student Account</button>
-</div>
+
+    <!-- Sign In Panel -->
+    <div id="loginPanel" class="auth-form">
+      <div class="controls">
+        <input id="loginIdentifier" type="text" placeholder="Email or User ID" autocomplete="username">
+        <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password">
+        <button class="primary" id="loginBtn">Sign In</button>
+      </div>
+      <p class="small">Students and Coaches sign in using their MPHAI credentials.</p>
+    </div>
+
+    <!-- Create Account Panel -->
+    <div id="signupPanel" class="auth-form hidden">
+      <div class="controls">
+        <input id="signupName" placeholder="Full Student Name">
+        <input id="signupUsername" placeholder="User ID / Username">
+        <input id="signupEmail" type="email" placeholder="Email address">
+        <input id="signupPassword" type="password" placeholder="Password (min. 6 characters)" autocomplete="new-password">
+        <button class="primary" id="signupBtn">Register Account</button>
+      </div>
+      <p class="small">New registrations are created as Student accounts.</p>
+    </div>
   </div>
+
+  <!-- Active User Status Bar -->
   <div id="userBar" class="hidden topbar">
     <div>Signed in as <b id="who"></b> <span id="roleBadge"></span></div>
     <button class="secondary" id="logoutBtn">Logout</button>
@@ -349,11 +394,21 @@ async function init(){
   supabase.auth.onAuthStateChange(async (_event,session)=>{if(session) await signedIn(session.user); else signedOut();});
 }
 
+// Tab Switching Function
+function switchAuthTab(tab) {
+  const isLogin = tab === 'login';
+  $('tabLogin').classList.toggle('active', isLogin);
+  $('tabSignup').classList.toggle('active', !isLogin);
+  $('loginPanel').classList.toggle('hidden', !isLogin);
+  $('signupPanel').classList.toggle('hidden', isLogin);
+  $('authMsg').textContent = '';
+}
+
 async function signedIn(u){
   user=u;
   const {data:p,error}=await supabase.from('profiles').select('*').eq('id',u.id).single();
   if(error){msg(error.message,'bad');return;} profile=p;
-  $('loginForm').classList.add('hidden');$('userBar').classList.remove('hidden');$('who').textContent=p.full_name;
+  $('authFormContainer').classList.add('hidden');$('userBar').classList.remove('hidden');$('who').textContent=p.full_name;
   $('roleBadge').textContent=p.role==='coach'?'(COACH)':'(STUDENT)';$('authMsg').textContent='';
   
   setupRealtimeLeaderboard();
@@ -373,7 +428,7 @@ async function signedIn(u){
 function signedOut(){
   unsubscribeRealtimeLeaderboard();
   user=null;profile=null;raceId=null;
-  $('loginForm').classList.remove('hidden');$('userBar').classList.add('hidden');
+  $('authFormContainer').classList.remove('hidden');$('userBar').classList.add('hidden');
   $('studentApp').classList.add('hidden');$('coachApp').classList.add('hidden');
   msg('Signed out.');
 }
@@ -406,7 +461,34 @@ function unsubscribeRealtimeLeaderboard() {
 // LOGIN HANDLER: Resolves User ID or Email before authenticating
 $('loginBtn').onclick = async () => {
   const identifier = $('loginIdentifier').value.trim();
-  const password = $('password').value;
+  const password = $('loginPassword').value;
+
+  if (!identifier || !password) {
+    msg('Please enter your Email/User ID and password.', 'bad');
+    return;
+  }
+
+  let emailToUse = identifier;
+
+  if (!identifier.includes('@')) {
+    const { data: resolvedEmail, error: rpcErr } = await supabase.rpc('get_user_email', {
+      p_identifier: identifier
+    });
+
+    if (rpcErr || !resolvedEmail) {
+      msg('User ID not found. Please check your User ID or log in with Email.', 'bad');
+      return;
+    }
+    emailToUse = resolvedEmail;
+  }
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email: emailToUse,
+    password: password
+  });
+
+  if (error) msg(error.message, 'bad');
+};
 
   if (!identifier || !password) {
     msg('Please enter your Email/User ID and password.', 'bad');
@@ -436,12 +518,42 @@ $('loginBtn').onclick = async () => {
   if (error) msg(error.message, 'bad');
 };
 
-// SIGNUP HANDLER: Saves username/User ID into profiles table upon registration
+// SIGNUP HANDLER: Registers new student account with dedicated password field
 $('signupBtn').onclick = async () => {
   const name = $('signupName').value.trim();
   const username = $('signupUsername').value.trim();
   const email = $('signupEmail').value.trim();
-  const password = $('password').value;
+  const password = $('signupPassword').value;
+
+  if (!name || !username || !email || password.length < 6) {
+    msg('Enter name, User ID, email, and a password of at least 6 characters.', 'bad');
+    return;
+  }
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { full_name: name, username: username }
+    }
+  });
+
+  if (error) {
+    msg(error.message, 'bad');
+    return;
+  }
+
+  if (data.user) {
+    await supabase.from('profiles').upsert({
+      id: data.user.id,
+      full_name: name,
+      username: username,
+      role: 'student'
+    });
+  }
+
+  msg(data.session ? 'Account created and signed in.' : 'Account created. Check confirmation email.');
+};
 
   if (!name || !username || !email || password.length < 6) {
     msg('Enter name, User ID, email, and a password of at least 6 characters.', 'bad');
