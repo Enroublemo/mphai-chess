@@ -13,7 +13,7 @@ input,button,select{padding:10px 12px;border-radius:8px;border:1px solid #ccc}
 button{border:0;cursor:pointer;font-weight:600}
 select{cursor:pointer;font-weight:600;background:#fff}
 .primary{background:#222;color:#fff}.secondary{background:#ddd}.danger{background:#b3261e;color:#fff}
-.hidden{display:none}.small{font-size:13px;color:#666}.ok{color:#137333;font-weight:bold}.bad{color:#b3261e;font-weight:bold}
+.hidden{display:none !important}.small{font-size:13px;color:#666}.ok{color:#137333;font-weight:bold}.bad{color:#b3261e;font-weight:bold}
 
 .student-link {
   color: #0066cc;
@@ -490,70 +490,12 @@ $('loginBtn').onclick = async () => {
   if (error) msg(error.message, 'bad');
 };
 
-  if (!identifier || !password) {
-    msg('Please enter your Email/User ID and password.', 'bad');
-    return;
-  }
-
-  let emailToUse = identifier;
-
-  // Resolve User ID to Email if no '@' symbol is present
-  if (!identifier.includes('@')) {
-    const { data: resolvedEmail, error: rpcErr } = await supabase.rpc('get_user_email', {
-      p_identifier: identifier
-    });
-
-    if (rpcErr || !resolvedEmail) {
-      msg('User ID not found. Please check your User ID or log in with Email.', 'bad');
-      return;
-    }
-    emailToUse = resolvedEmail;
-  }
-
-  const { error } = await supabase.auth.signInWithPassword({
-    email: emailToUse,
-    password: password
-  });
-
-  if (error) msg(error.message, 'bad');
-};
-
 // SIGNUP HANDLER: Registers new student account with dedicated password field
 $('signupBtn').onclick = async () => {
   const name = $('signupName').value.trim();
   const username = $('signupUsername').value.trim();
   const email = $('signupEmail').value.trim();
   const password = $('signupPassword').value;
-
-  if (!name || !username || !email || password.length < 6) {
-    msg('Enter name, User ID, email, and a password of at least 6 characters.', 'bad');
-    return;
-  }
-
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { full_name: name, username: username }
-    }
-  });
-
-  if (error) {
-    msg(error.message, 'bad');
-    return;
-  }
-
-  if (data.user) {
-    await supabase.from('profiles').upsert({
-      id: data.user.id,
-      full_name: name,
-      username: username,
-      role: 'student'
-    });
-  }
-
-  msg(data.session ? 'Account created and signed in.' : 'Account created. Check confirmation email.');
-};
 
   if (!name || !username || !email || password.length < 6) {
     msg('Enter name, User ID, email, and a password of at least 6 characters.', 'bad');
