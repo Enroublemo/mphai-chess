@@ -2,4 +2,3 @@
 ALTER TABLE user_progress 
 ADD COLUMN IF NOT EXISTS last_category TEXT DEFAULT 'Puzzle',
 ADD COLUMN IF NOT EXISTS last_subcategory TEXT DEFAULT 'puzzle_race';
-
