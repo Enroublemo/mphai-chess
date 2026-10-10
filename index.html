@@ -399,8 +399,10 @@ async function init(){
 function switchAuthTab(tab) {
   const isLogin = tab === 'login';
   $('tabLogin').classList.toggle('active', isLogin);
-  $('tabSignup').classList.toggle('active', !isLogin);$('loginPanel').classList.toggle('hidden', !isLogin);
-  $('signupPanel').classList.toggle('hidden', isLogin);$('authMsg').textContent = '';
+  $('tabSignup').classList.toggle('active', !isLogin);
+  $('loginPanel').classList.toggle('hidden', !isLogin);
+  $('signupPanel').classList.toggle('hidden', isLogin);
+  $('authMsg').textContent = '';
 }
 
 async function signedIn(u){
@@ -710,6 +712,7 @@ async function resumeOrCreateRace(moduleType = 'mate_in1'){
     return;
   }
 
+  // 1. Check for active (uncompleted) race session first
   const { data: activeRaces, error: rErr } = await supabase
     .from('race_sessions')
     .select('id')
@@ -719,11 +722,49 @@ async function resumeOrCreateRace(moduleType = 'mate_in1'){
     .order('started_at', { ascending: false })
     .limit(1);
 
-  if (rErr || !activeRaces || activeRaces.length === 0) {
+  if (rErr) { $('message').textContent = rErr.message; return; }
+
+  // 2. If NO active race, check if student ALREADY completed a race for this module
+  if (!activeRaces || activeRaces.length === 0) {
+    const { data: completedRaces } = await supabase
+      .from('race_sessions')
+      .select('id, completed_at')
+      .eq('student_id', user.id)
+      .eq('module_type', moduleType)
+      .not('completed_at', 'is', null)
+      .order('completed_at', { ascending: false })
+      .limit(1);
+
+    if (completedRaces && completedRaces.length > 0) {
+      raceId = completedRaces[0].id;
+
+      const { data: attempts } = await supabase
+        .from('puzzle_attempts')
+        .select('*')
+        .eq('race_id', raceId);
+
+      points = 0; correct = 0; totalAttempts = attempts ? attempts.length : 0; raceFinished = true;
+      (attempts || []).forEach(a => {
+        points += a.points;
+        if (a.is_correct) correct++;
+      });
+
+      idx = puzzles.length - 1;
+      $('num').textContent = `${puzzles.length} / ${puzzles.length}`;
+      $('title').textContent = `Puzzle Race Completed`;
+      $('message').innerHTML = `<span class="ok">Race complete!</span> Correct: ${correct}/${puzzles.length}, Points: ${points}. Click <b>Restart Race</b> if you want to try again.`;
+      $('next').disabled = true;
+      updateStats();
+      await refreshLeaderboard();
+      return;
+    }
+
+    // Never started before — start brand new race session
     await startRace(moduleType);
     return;
   }
 
+  // 3. Active race found — resume from where student left off
   raceId = activeRaces[0].id;
 
   const { data: attempts, error: aErr } = await supabase
@@ -875,7 +916,6 @@ async function clickSquare(sq) {
     const san = move.san;
     selected = null;
 
-    // Check if user's move exists in the Decision Tree
     if (currentTreeNode.children && currentTreeNode.children[san]) {
       if (!firstMoveSAN) firstMoveSAN = san;
       currentTreeNode = currentTreeNode.children[san];
@@ -884,7 +924,6 @@ async function clickSquare(sq) {
       const blackReplies = Object.keys(currentTreeNode.children);
 
       if (blackReplies.length > 0) {
-        // Automatic Black reply
         isEngineMoving = true;
         $('message').innerHTML = '<span class="ok">Good move!</span> Opponent replying…';
 
@@ -897,7 +936,6 @@ async function clickSquare(sq) {
 
           const furtherReplies = Object.keys(currentTreeNode.children);
           if (furtherReplies.length === 0) {
-            // Puzzle completed after Black reply (e.g. checkmate or forced end)
             submitAttempt(firstMoveSAN);
           } else {
             $('message').textContent = 'Find the next move!';
@@ -905,12 +943,10 @@ async function clickSquare(sq) {
         }, 500);
 
       } else {
-        // Line completed directly by White
         await submitAttempt(firstMoveSAN);
       }
 
     } else {
-      // Incorrect move played
       game.undo();
       render();
       await submitAttempt(san);
