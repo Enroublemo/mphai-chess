@@ -25,13 +25,26 @@ select{cursor:pointer;font-weight:600;background:#fff}
   color: #004499;
 }
 
+/* Flex container for board and side solution panel */
+.puzzle-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.puzzle-board-container {
+  flex: 0 0 auto;
+}
+
 #board-wrapper {
   display: inline-block;
   background: #3e2723;
   padding: 10px 12px;
   border-radius: 8px;
   box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-  margin: 15px auto;
+  margin: 5px auto;
 }
 
 .board-files {
@@ -99,6 +112,41 @@ select{cursor:pointer;font-weight:600;background:#fff}
 .piece-b {
   color: #111111;
   filter: drop-shadow(0px 0px 1px #ffffff) drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.6));
+}
+
+/* Solution Display Panel on the right */
+.solution-panel {
+  flex: 1;
+  min-width: 260px;
+  background: #f8f9fa;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 18px 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  align-self: center;
+}
+
+.solution-panel h4 {
+  margin: 0 0 12px 0;
+  color: #3e2723;
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #3e2723;
+  padding-bottom: 6px;
+}
+
+.solution-panel .solution-text {
+  font-size: 16px;
+  line-height: 1.6;
+  color: #222;
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: bold;
+  background: #fff;
+  padding: 12px 14px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  word-break: break-word;
 }
 
 /* Auth Tab Navigation Styling */
@@ -253,32 +301,47 @@ select{cursor:pointer;font-weight:600;background:#fff}
 
   <div class="card">
   <h3 id="title">Puzzle Race</h3><div id="message">Start a race.</div>
-  <div id="board-wrapper">
-    <div class="board-files top-files">
-      <span>A</span><span>B</span><span>C</span><span>D</span>
-      <span>E</span><span>F</span><span>G</span><span>H</span>
+
+  <div class="puzzle-layout">
+    <div class="puzzle-board-container">
+      <div id="board-wrapper">
+        <div class="board-files top-files">
+          <span>A</span><span>B</span><span>C</span><span>D</span>
+          <span>E</span><span>F</span><span>G</span><span>H</span>
+        </div>
+
+        <div class="board-main-area">
+          <div class="board-ranks">
+            <span>8</span><span>7</span><span>6</span><span>5</span>
+            <span>4</span><span>3</span><span>2</span><span>1</span>
+          </div>
+
+          <div id="board"></div>
+
+          <div class="board-ranks">
+            <span>8</span><span>7</span><span>6</span><span>5</span>
+            <span>4</span><span>3</span><span>2</span><span>1</span>
+          </div>
+        </div>
+
+        <div class="board-files bottom-files">
+          <span>A</span><span>B</span><span>C</span><span>D</span>
+          <span>E</span><span>F</span><span>G</span><span>H</span>
+        </div>
+      </div>
     </div>
 
-    <div class="board-main-area">
-      <div class="board-ranks">
-        <span>8</span><span>7</span><span>6</span><span>5</span>
-        <span>4</span><span>3</span><span>2</span><span>1</span>
-      </div>
-
-      <div id="board"></div>
-
-      <div class="board-ranks">
-        <span>8</span><span>7</span><span>6</span><span>5</span>
-        <span>4</span><span>3</span><span>2</span><span>1</span>
-      </div>
-    </div>
-
-    <div class="board-files bottom-files">
-      <span>A</span><span>B</span><span>C</span><span>D</span>
-      <span>E</span><span>F</span><span>G</span><span>H</span>
+    <!-- Solution Display Panel on the Right -->
+    <div id="solutionPanel" class="solution-panel hidden">
+      <h4>Solution / Variation</h4>
+      <div id="solutionText" class="solution-text"></div>
     </div>
   </div>
-  <div class="controls"><button class="danger" id="resetPosition">Restart Race</button><button class="primary" id="next" disabled>Next Puzzle</button></div>
+
+  <div class="controls" style="margin-top: 15px;">
+    <button class="danger" id="resetPosition">Restart Race</button>
+    <button class="primary" id="next" disabled>Next Puzzle</button>
+  </div>
   </div>
 </section>
 
@@ -708,11 +771,11 @@ async function resumeOrCreateRace(moduleType = 'mate_in1'){
   if (!puzzles.length) await loadPuzzles(moduleType);
 
   if (!puzzles.length) {
-    $('message').textContent = 'No puzzles available for this module yet.';$('num').textContent = '—';
+    $('message').textContent = 'No puzzles available for this module yet.';
+    $('num').textContent = '—';
     return;
   }
 
-  // 1. Check if CURRENT user has an ACTIVE (uncompleted) race session
   const { data: activeRaces, error: rErr } = await supabase
     .from('race_sessions')
     .select('id')
@@ -724,7 +787,6 @@ async function resumeOrCreateRace(moduleType = 'mate_in1'){
 
   if (rErr) { $('message').textContent = rErr.message; return; }
 
-  // 2. If NO active race exists for CURRENT user, check if CURRENT user completed one
   if (!activeRaces || activeRaces.length === 0) {
     const { data: completedRaces } = await supabase
       .from('race_sessions')
@@ -760,12 +822,10 @@ async function resumeOrCreateRace(moduleType = 'mate_in1'){
       return;
     }
 
-    // Never played this module before — start brand new race session for this user
     await startRace(moduleType);
     return;
   }
 
-  // 3. Active race session found for CURRENT user
   raceId = activeRaces[0].id;
 
   const { data: attempts, error: aErr } = await supabase
@@ -786,7 +846,6 @@ async function resumeOrCreateRace(moduleType = 'mate_in1'){
     attemptsByPuzzle[a.puzzle_id].push(a);
   });
 
-  // Find first unsolved puzzle for this user
   let currentIdx = -1;
   for (let i = 0; i < puzzles.length; i++) {
     const pId = puzzles[i].id;
@@ -800,7 +859,6 @@ async function resumeOrCreateRace(moduleType = 'mate_in1'){
     }
   }
 
-  // If user actually answered all puzzles in active session
   if (currentIdx === -1 && totalAttempts > 0) {
     await supabase.rpc('complete_race', { p_race_id: raceId });
     raceFinished = true;
@@ -811,7 +869,6 @@ async function resumeOrCreateRace(moduleType = 'mate_in1'){
     return;
   }
 
-  // Standard resume: start at first unsolved puzzle (or Puzzle 1 if 0 attempts)
   idx = currentIdx === -1 ? 0 : currentIdx;
   loadPuzzle();
 
@@ -824,12 +881,50 @@ async function resumeOrCreateRace(moduleType = 'mate_in1'){
 
 $('startBtn').onclick = () => startRace(currentModule);
 
+function formatSolutionText(puzzle) {
+  if (puzzle.movetext && typeof puzzle.movetext === 'string' && puzzle.movetext.trim().length > 0) {
+    return puzzle.movetext;
+  }
+  
+  let moves = [];
+  if (Array.isArray(puzzle.solution_san)) {
+    moves = puzzle.solution_san;
+  } else if (typeof puzzle.solution_san === 'string') {
+    try {
+      moves = JSON.parse(puzzle.solution_san);
+    } catch (e) {
+      moves = puzzle.solution_san.replace(/[\[\]"]/g, '').split(',').map(m => m.trim()).filter(Boolean);
+    }
+  }
+
+  let formatted = '';
+  for (let i = 0; i < moves.length; i++) {
+    if (i % 2 === 0) {
+      formatted += `${Math.floor(i / 2) + 1}. ${moves[i]} `;
+    } else {
+      formatted += `${moves[i]} `;
+    }
+  }
+  return formatted.trim() || 'No variation data available.';
+}
+
+function displaySolutionPanel() {
+  const currentPuzzle = puzzles[idx];
+  if (!currentPuzzle) return;
+
+  const solText = formatSolutionText(currentPuzzle);
+  $('solutionText').textContent = solText;
+  $('solutionPanel').classList.remove('hidden');
+}
+
 function loadPuzzle(){
   tries=0; selected=null; puzzleCompleted=false; isEngineMoving = false;
   game=new Chess(puzzles[idx].fen);
   puzzleTree = buildPuzzleTree(puzzles[idx]);
   currentTreeNode = puzzleTree;
   firstMoveSAN = null;
+
+  $('solutionPanel').classList.add('hidden');$('solutionText').textContent = '';
 
   $('num').textContent=`${idx+1} / ${puzzles.length}`; $('title').textContent=`Puzzle ${idx+1}`;
   $('message').textContent='Find the best move.';$('next').disabled=true; render(); updateStats();
@@ -987,13 +1082,13 @@ async function submitAttempt(san){
 
   if (r.is_correct) {
     puzzleCompleted = true;
+    displaySolutionPanel();
 
     if (isLastPuzzle) {
-      // User just solved the final puzzle in the module
       await supabase.rpc('complete_race', { p_race_id: raceId });
       raceFinished = true;
       $('message').innerHTML = `<span class="ok">✓ Correct! Race Complete!</span> You finished all ${puzzles.length} puzzles! Final Score: <b>${points}</b> points.`;
-      $('next').disabled = true; // Permanently disabled for end of module
+      $('next').disabled = true;
     } else {
       $('message').innerHTML = `<span class="ok">✓ Correct!</span> You earned ${r.points_awarded} point${r.points_awarded === 1 ? '' : 's'}. Click <b>Next Puzzle</b> to continue.`;
       $('next').disabled = false;
@@ -1004,16 +1099,16 @@ async function submitAttempt(san){
     resetBoardToStart();
 
   } else {
-    // Attempt limit exhausted (3 failed tries)
     puzzleCompleted = true;
+    displaySolutionPanel();
 
     if (isLastPuzzle) {
       await supabase.rpc('complete_race', { p_race_id: raceId });
       raceFinished = true;
-      $('message').innerHTML = `<span class="bad">✗ Three attempts used.</span> Solution: <b>${escapeHtml(r.solution_san || '')}</b>.<br><span class="ok">Race Complete!</span> Final Score: <b>${points}</b> points.`;
-      $('next').disabled = true; // Permanently disabled for end of module
+      $('message').innerHTML = `<span class="bad">✗ Three attempts used.</span><br><span class="ok">Race Complete!</span> Final Score: <b>${points}</b> points.`;
+      $('next').disabled = true;
     } else {
-      $('message').innerHTML = `<span class="bad">✗ Three attempts used.</span> Solution: <b>${escapeHtml(r.solution_san || '')}</b>. Click <b>Next Puzzle</b> to continue.`;
+      $('message').innerHTML = `<span class="bad">✗ Three attempts used.</span> Click <b>Next Puzzle</b> to continue.`;
       $('next').disabled = false;
     }
 
@@ -1032,13 +1127,11 @@ function resetBoardToStart() {
   render();
 }
 
-// Next button handler
 $('next').onclick = async () => {
   if (idx < puzzles.length - 1) {
     idx++;
     loadPuzzle();
   } else {
-    // Safeguard check if clicked at the end
     await supabase.rpc('complete_race', { p_race_id: raceId });
     raceFinished = true;
     $('message').innerHTML = `<span class="ok">Race complete!</span> Correct: ${correct}/${puzzles.length}, Points: ${points}`;
@@ -1047,7 +1140,6 @@ $('next').onclick = async () => {
   }
 };
 
-// Restart Race button (always remains clickable and active)
 $('resetPosition').onclick = async () => {
   const confirmed = confirm("Are you sure you want to restart? Your current points and progress for this module will be reset, and you will start back at Puzzle 1.");
   if (confirmed) {
@@ -1058,25 +1150,9 @@ $('resetPosition').onclick = async () => {
 function updateStats(){$('correct').textContent=correct;$('points').textContent=points;$('attempts').textContent=totalAttempts;}
 
 async function refreshLeaderboard(){
-  const { data, error } = await supabase.rpc('get_global_leaderboard');
-  if (error) {
-    $('leaderboard').innerHTML = `<tr><td colspan="4">${escapeHtml(error.message)}</td></tr>`;
-    return;
-  }
-  
-  if (!data || data.length === 0) {
-    $('leaderboard').innerHTML = '<tr><td colspan="4">No student records found.</td></tr>';
-    return;
-  }
-
-  $('leaderboard').innerHTML = data.map(v => `
-    <tr>
-      <td>${escapeHtml(v.full_name)}</td>
-      <td>${v.correct}</td>
-      <td><b>${v.points}</b></td>
-      <td>${v.attempts}</td>
-    </tr>
-  `).join('');
+ const {data,error}=await supabase.rpc('get_global_leaderboard');
+ if(error){$('leaderboard').innerHTML=`<tr><td colspan="4">${escapeHtml(error.message)}</td></tr>`;return;}
+ $('leaderboard').innerHTML=(data||[]).map(v=>`<tr><td>${escapeHtml(v.full_name)}</td><td>${v.correct}</td><td><b>${v.points}</b></td><td>${v.attempts}</td></tr>`).join('')||'<tr><td colspan="4">No completed races yet.</td></tr>';
 }
 
 async function loadCoach(){
