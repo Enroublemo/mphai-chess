@@ -964,30 +964,62 @@ async function clickSquare(sq) {
 }
 
 async function submitAttempt(san){
-  $('message').textContent='Checking result…';
-  const {data,error}=await supabase.rpc('submit_puzzle_attempt',{p_race_id:raceId,p_puzzle_id:puzzles[idx].id,p_answer_san:san});
+  $('message').textContent = 'Checking result…';
+  const { data, error } = await supabase.rpc('submit_puzzle_attempt', {
+    p_race_id: raceId,
+    p_puzzle_id: puzzles[idx].id,
+    p_answer_san: san
+  });
   
-  if(error){
-    $('message').innerHTML='<span class="bad">Error:</span> '+escapeHtml(error.message);
+  if (error) {
+    $('message').innerHTML = '<span class="bad">Error:</span> ' + escapeHtml(error.message);
     resetBoardToStart();
     return;
   }
   
-  const r=data[0]; tries=r.attempt_no; totalAttempts++; points+=r.points_awarded; if(r.is_correct) correct++;
+  const r = data[0]; 
+  tries = r.attempt_no; 
+  totalAttempts++; 
+  points += r.points_awarded; 
+  if (r.is_correct) correct++;
 
-  if(r.is_correct){
+  const isLastPuzzle = (idx === puzzles.length - 1);
+
+  if (r.is_correct) {
     puzzleCompleted = true;
-    $('message').innerHTML=`<span class="ok">✓ Correct!</span> You earned ${r.points_awarded} point${r.points_awarded===1?'':'s'}. Click <b>Next Puzzle</b> to continue.`;
-    $('next').disabled=false;
-  } else if(r.attempts_used<3){
-    $('message').innerHTML=`<span class="bad">✗ Not quite.</span> Try again. Attempt ${r.attempts_used} of 3.`;
+
+    if (isLastPuzzle) {
+      // User just solved the final puzzle in the module
+      await supabase.rpc('complete_race', { p_race_id: raceId });
+      raceFinished = true;
+      $('message').innerHTML = `<span class="ok">✓ Correct! Race Complete!</span> You finished all ${puzzles.length} puzzles! Final Score: <b>${points}</b> points.`;
+      $('next').disabled = true; // Permanently disabled for end of module
+    } else {
+      $('message').innerHTML = `<span class="ok">✓ Correct!</span> You earned ${r.points_awarded} point${r.points_awarded === 1 ? '' : 's'}. Click <b>Next Puzzle</b> to continue.`;
+      $('next').disabled = false;
+    }
+
+  } else if (r.attempts_used < 3) {
+    $('message').innerHTML = `<span class="bad">✗ Not quite.</span> Try again. Attempt ${r.attempts_used} of 3.`;
     resetBoardToStart();
+
   } else {
+    // Attempt limit exhausted (3 failed tries)
     puzzleCompleted = true;
-    $('message').innerHTML=`<span class="bad">✗ Three attempts used.</span> Solution: <b>${escapeHtml(r.solution_san||'')}</b>. Click <b>Next Puzzle</b> to continue.`;
-    $('next').disabled=false;
+
+    if (isLastPuzzle) {
+      await supabase.rpc('complete_race', { p_race_id: raceId });
+      raceFinished = true;
+      $('message').innerHTML = `<span class="bad">✗ Three attempts used.</span> Solution: <b>${escapeHtml(r.solution_san || '')}</b>.<br><span class="ok">Race Complete!</span> Final Score: <b>${points}</b> points.`;
+      $('next').disabled = true; // Permanently disabled for end of module
+    } else {
+      $('message').innerHTML = `<span class="bad">✗ Three attempts used.</span> Solution: <b>${escapeHtml(r.solution_san || '')}</b>. Click <b>Next Puzzle</b> to continue.`;
+      $('next').disabled = false;
+    }
+
     resetBoardToStart();
   }
+
   updateStats();
   await refreshLeaderboard();
 }
@@ -1000,17 +1032,24 @@ function resetBoardToStart() {
   render();
 }
 
-$('next').onclick=async()=>{
- if(idx<puzzles.length-1){idx++;loadPuzzle();}
- else{
-   await supabase.rpc('complete_race',{p_race_id:raceId});raceFinished=true;
-   $('message').innerHTML=`<span class="ok">Race complete!</span> Correct: ${correct}/${puzzles.length}, Points: ${points}`;
-   $('next').disabled=true;await refreshLeaderboard();
- }
+// Next button handler
+$('next').onclick = async () => {
+  if (idx < puzzles.length - 1) {
+    idx++;
+    loadPuzzle();
+  } else {
+    // Safeguard check if clicked at the end
+    await supabase.rpc('complete_race', { p_race_id: raceId });
+    raceFinished = true;
+    $('message').innerHTML = `<span class="ok">Race complete!</span> Correct: ${correct}/${puzzles.length}, Points: ${points}`;
+    $('next').disabled = true;
+    await refreshLeaderboard();
+  }
 };
 
+// Restart Race button (always remains clickable and active)
 $('resetPosition').onclick = async () => {
-  const confirmed = confirm("Are you sure you want to restart? Your current points and progress for this module will be reset to 0, and you will start back at Puzzle 1.");
+  const confirmed = confirm("Are you sure you want to restart? Your current points and progress for this module will be reset, and you will start back at Puzzle 1.");
   if (confirmed) {
     await startRace(currentModule);
   }
