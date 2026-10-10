@@ -358,8 +358,7 @@ const pieceSVGs = {
 // Category and Section Metadata Map
 const CATEGORY_MAP = {
    Puzzle: [
-    { id: 'mate_in1', name: 'Mate in 1', desc: 'Everyone follows the same Puzzle sequence from Puzzle 1 up to the last Puzzle. First correct attempt = 3 points; second = 2; third = 1. A wrong third attempt reveals the solution.' },
-    { id: 'mate_in2', name: 'Mate in 2', desc: 'Solve Mate in 2 puzzles with dynamic decision tree replies.' },
+    { id: 'mate_in1', name: 'Mate in 1', desc: 'Everyone follows the same Puzzle sequence from Puzzle 1  up to the last Puzzle. First correct attempt = 3 points; second = 2; third = 1. A wrong third attempt reveals the solution.' },
     { id: 'endgame_solving', name: 'Endgame Puzzle Race', desc: 'Practice essential endgame positions.' }
   ],
   Opening: [
@@ -382,7 +381,6 @@ const CATEGORY_MAP = {
 
 let currentModule = 'mate_in1';
 let user=null, profile=null, puzzles=[], raceId=null, idx=0, game=null, selected=null, tries=0, correct=0, points=0, totalAttempts=0, raceFinished=false, puzzleCompleted=false;
-let puzzleTree = null, currentTreeNode = null, firstMoveSAN = null, isEngineMoving = false;
 let leaderboardChannel = null;
 
 const $=id=>document.getElementById(id);
@@ -396,11 +394,14 @@ async function init(){
   supabase.auth.onAuthStateChange(async (_event,session)=>{if(session) await signedIn(session.user); else signedOut();});
 }
 
+// Tab Switching Function
 function switchAuthTab(tab) {
   const isLogin = tab === 'login';
   $('tabLogin').classList.toggle('active', isLogin);
-  $('tabSignup').classList.toggle('active', !isLogin);$('loginPanel').classList.toggle('hidden', !isLogin);
-  $('signupPanel').classList.toggle('hidden', isLogin);$('authMsg').textContent = '';
+  $('tabSignup').classList.toggle('active', !isLogin);
+  $('loginPanel').classList.toggle('hidden', !isLogin);
+  $('signupPanel').classList.toggle('hidden', isLogin);
+  $('authMsg').textContent = '';
 }
 
 async function signedIn(u){
@@ -457,6 +458,7 @@ function unsubscribeRealtimeLeaderboard() {
   }
 }
 
+// LOGIN HANDLER: Resolves User ID or Email before authenticating
 $('loginBtn').onclick = async () => {
   const identifier = $('loginIdentifier').value.trim();
   const password = $('loginPassword').value;
@@ -488,6 +490,7 @@ $('loginBtn').onclick = async () => {
   if (error) msg(error.message, 'bad');
 };
 
+// SIGNUP HANDLER: Registers new student account with dedicated password field
 $('signupBtn').onclick = async () => {
   const name = $('signupName').value.trim();
   const username = $('signupUsername').value.trim();
@@ -525,6 +528,8 @@ $('signupBtn').onclick = async () => {
 };
 
 $('logoutBtn').onclick=()=>supabase.auth.signOut();
+
+// --- DROPDOWN & NAVIGATION PERSISTENCE LOGIC ---
 
 function populateSubcategories(mainCat, selectedSubId = null) {
   const subSelect = $('subCategorySelect');
@@ -624,64 +629,6 @@ $('subCategorySelect').onchange = async (e) => {
   await switchModule(cat, subcat);
 };
 
-// --- DYNAMIC DECISION TREE ENGINE ---
-
-function buildPuzzleTree(puzzle) {
-  const root = { move: 'root', children: {} };
-
-  if (puzzle.movetext && typeof puzzle.movetext === 'string' && puzzle.movetext.trim().length > 0) {
-    let cleaned = puzzle.movetext
-      .replace(/\{[^}]*\}/g, '')
-      .replace(/\[[^\]]*\]/g, '')
-      .replace(/\d+\.\.\.|\d+\./g, '')
-      .replace(/\*|1-0|0-1|1\/2-1\/2/g, '');
-
-    const rawTokens = cleaned.match(/\(|\)|[^\(\)\s]+/g) || [];
-    const stack = [];
-    let curr = root;
-
-    for (let i = 0; i < rawTokens.length; i++) {
-      const t = rawTokens[i];
-      if (t === '(') {
-        stack.push(curr);
-        curr = curr.parent || root;
-      } else if (t === ')') {
-        if (stack.length > 0) {
-          curr = stack.pop();
-        }
-      } else {
-        if (!curr.children[t]) {
-          const node = { move: t, children: {}, parent: curr };
-          curr.children[t] = node;
-        }
-        curr = curr.children[t];
-      }
-    }
-    return root;
-  }
-
-  let moves = [];
-  if (Array.isArray(puzzle.solution_san)) {
-    moves = puzzle.solution_san;
-  } else if (typeof puzzle.solution_san === 'string') {
-    try {
-      moves = JSON.parse(puzzle.solution_san);
-    } catch (e) {
-      moves = puzzle.solution_san.replace(/[\[\]"]/g, '').split(',').map(m => m.trim()).filter(Boolean);
-    }
-  }
-
-  let curr = root;
-  for (let i = 0; i < moves.length; i++) {
-    const m = moves[i];
-    const node = { move: m, children: {}, parent: curr };
-    curr.children[m] = node;
-    curr = node;
-  }
-
-  return root;
-}
-
 // --- PUZZLE RACE ENGINE & SUPABASE RPCs ---
 
 async function loadPuzzles(moduleType = 'mate_in1'){
@@ -779,12 +726,7 @@ async function resumeOrCreateRace(moduleType = 'mate_in1'){
 $('startBtn').onclick = () => startRace(currentModule);
 
 function loadPuzzle(){
-  tries=0; selected=null; puzzleCompleted=false; isEngineMoving = false;
-  game=new Chess(puzzles[idx].fen);
-  puzzleTree = buildPuzzleTree(puzzles[idx]);
-  currentTreeNode = puzzleTree;
-  firstMoveSAN = null;
-
+  tries=0; selected=null; puzzleCompleted=false; game=new Chess(puzzles[idx].fen);
   $('num').textContent=`${idx+1} / ${puzzles.length}`; $('title').textContent=`Puzzle ${idx+1}`;
   $('message').textContent='Find the best move.';$('next').disabled=true; render(); updateStats();
 }
@@ -836,7 +778,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function clickSquare(sq) {
-  if (!raceId || raceFinished || puzzleCompleted || isEngineMoving) return;
+  if (!raceId || raceFinished || puzzleCompleted) return;
   const piece = game.get(sq);
 
   if (selected) {
@@ -873,48 +815,10 @@ async function clickSquare(sq) {
     }
 
     const san = move.san;
+    game.undo();
     selected = null;
-
-    // Check if user's move exists in the Decision Tree
-    if (currentTreeNode.children && currentTreeNode.children[san]) {
-      if (!firstMoveSAN) firstMoveSAN = san;
-      currentTreeNode = currentTreeNode.children[san];
-      render();
-
-      const blackReplies = Object.keys(currentTreeNode.children);
-
-      if (blackReplies.length > 0) {
-        // Automatic Black reply
-        isEngineMoving = true;
-        $('message').innerHTML = '<span class="ok">Good move!</span> Opponent replying…';
-
-        setTimeout(() => {
-          const blackSan = blackReplies[0];
-          game.move(blackSan, { sloppy: true });
-          currentTreeNode = currentTreeNode.children[blackSan];
-          isEngineMoving = false;
-          render();
-
-          const furtherReplies = Object.keys(currentTreeNode.children);
-          if (furtherReplies.length === 0) {
-            // Puzzle completed after Black reply (e.g. checkmate or forced end)
-            submitAttempt(firstMoveSAN);
-          } else {
-            $('message').textContent = 'Find the next move!';
-          }
-        }, 500);
-
-      } else {
-        // Line completed directly by White
-        await submitAttempt(firstMoveSAN);
-      }
-
-    } else {
-      // Incorrect move played
-      game.undo();
-      render();
-      await submitAttempt(san);
-    }
+    render();
+    await submitAttempt(san);
 
   } else if (piece && piece.color === game.turn()) {
     selected = sq;
@@ -925,13 +829,7 @@ async function clickSquare(sq) {
 async function submitAttempt(san){
   $('message').textContent='Checking result…';
   const {data,error}=await supabase.rpc('submit_puzzle_attempt',{p_race_id:raceId,p_puzzle_id:puzzles[idx].id,p_answer_san:san});
-  
-  if(error){
-    $('message').innerHTML='<span class="bad">Error:</span> '+escapeHtml(error.message);
-    resetBoardToStart();
-    return;
-  }
-  
+  if(error){$('message').innerHTML='<span class="bad">Error:</span> '+escapeHtml(error.message);return;}
   const r=data[0]; tries=r.attempt_no; totalAttempts++; points+=r.points_awarded; if(r.is_correct) correct++;
 
   if(r.is_correct){
@@ -940,23 +838,13 @@ async function submitAttempt(san){
     $('next').disabled=false;
   } else if(r.attempts_used<3){
     $('message').innerHTML=`<span class="bad">✗ Not quite.</span> Try again. Attempt ${r.attempts_used} of 3.`;
-    resetBoardToStart();
   } else {
     puzzleCompleted = true;
     $('message').innerHTML=`<span class="bad">✗ Three attempts used.</span> Solution: <b>${escapeHtml(r.solution_san||'')}</b>. Click <b>Next Puzzle</b> to continue.`;
     $('next').disabled=false;
-    resetBoardToStart();
   }
   updateStats();
   await refreshLeaderboard();
-}
-
-function resetBoardToStart() {
-  game = new Chess(puzzles[idx].fen);
-  currentTreeNode = puzzleTree;
-  firstMoveSAN = null;
-  selected = null;
-  render();
 }
 
 $('next').onclick=async()=>{
