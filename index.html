@@ -1014,9 +1014,25 @@ $('resetPosition').onclick = async () => {
 function updateStats(){$('correct').textContent=correct;$('points').textContent=points;$('attempts').textContent=totalAttempts;}
 
 async function refreshLeaderboard(){
- const {data,error}=await supabase.rpc('get_global_leaderboard');
- if(error){$('leaderboard').innerHTML=`<tr><td colspan="4">${escapeHtml(error.message)}</td></tr>`;return;}
- $('leaderboard').innerHTML=(data||[]).map(v=>`<tr><td>${escapeHtml(v.full_name)}</td><td>${v.correct}</td><td><b>${v.points}</b></td><td>${v.attempts}</td></tr>`).join('')||'<tr><td colspan="4">No completed races yet.</td></tr>';
+  const { data, error } = await supabase.rpc('get_global_leaderboard');
+  if (error) {
+    $('leaderboard').innerHTML = `<tr><td colspan="4">${escapeHtml(error.message)}</td></tr>`;
+    return;
+  }
+  
+  if (!data || data.length === 0) {
+    $('leaderboard').innerHTML = '<tr><td colspan="4">No student records found.</td></tr>';
+    return;
+  }
+
+  $('leaderboard').innerHTML = data.map(v => `
+    <tr>
+      <td>${escapeHtml(v.full_name)}</td>
+      <td>${v.correct}</td>
+      <td><b>${v.points}</b></td>
+      <td>${v.attempts}</td>
+    </tr>
+  `).join('');
 }
 
 async function loadCoach(){
