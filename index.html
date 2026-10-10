@@ -712,7 +712,7 @@ async function resumeOrCreateRace(moduleType = 'mate_in1'){
     return;
   }
 
-  // 1. Check for active (uncompleted) race session first
+  // 1. Check if CURRENT user has an ACTIVE (uncompleted) race session
   const { data: activeRaces, error: rErr } = await supabase
     .from('race_sessions')
     .select('id')
@@ -724,7 +724,7 @@ async function resumeOrCreateRace(moduleType = 'mate_in1'){
 
   if (rErr) { $('message').textContent = rErr.message; return; }
 
-  // 2. If NO active race, check if student ALREADY completed a race for this module
+  // 2. If NO active race exists for CURRENT user, check if CURRENT user completed one
   if (!activeRaces || activeRaces.length === 0) {
     const { data: completedRaces } = await supabase
       .from('race_sessions')
@@ -741,7 +741,8 @@ async function resumeOrCreateRace(moduleType = 'mate_in1'){
       const { data: attempts } = await supabase
         .from('puzzle_attempts')
         .select('*')
-        .eq('race_id', raceId);
+        .eq('race_id', raceId)
+        .eq('student_id', user.id);
 
       points = 0; correct = 0; totalAttempts = attempts ? attempts.length : 0; raceFinished = true;
       (attempts || []).forEach(a => {
@@ -759,18 +760,19 @@ async function resumeOrCreateRace(moduleType = 'mate_in1'){
       return;
     }
 
-    // Never started before — start brand new race session
+    // Never played this module before — start brand new race session for this user
     await startRace(moduleType);
     return;
   }
 
-  // 3. Active race found — resume from where student left off
+  // 3. Active race session found for CURRENT user
   raceId = activeRaces[0].id;
 
   const { data: attempts, error: aErr } = await supabase
     .from('puzzle_attempts')
     .select('*')
-    .eq('race_id', raceId);
+    .eq('race_id', raceId)
+    .eq('student_id', user.id);
 
   if (aErr) { $('message').textContent = aErr.message; return; }
 
@@ -784,6 +786,7 @@ async function resumeOrCreateRace(moduleType = 'mate_in1'){
     attemptsByPuzzle[a.puzzle_id].push(a);
   });
 
+  // Find first unsolved puzzle for this user
   let currentIdx = -1;
   for (let i = 0; i < puzzles.length; i++) {
     const pId = puzzles[i].id;
@@ -797,7 +800,8 @@ async function resumeOrCreateRace(moduleType = 'mate_in1'){
     }
   }
 
-  if (currentIdx === -1) {
+  // If user actually answered all puzzles in active session
+  if (currentIdx === -1 && totalAttempts > 0) {
     await supabase.rpc('complete_race', { p_race_id: raceId });
     raceFinished = true;
     $('message').innerHTML = `<span class="ok">Race complete!</span> Correct: ${correct}/${puzzles.length}, Points: ${points}`;
@@ -807,7 +811,8 @@ async function resumeOrCreateRace(moduleType = 'mate_in1'){
     return;
   }
 
-  idx = currentIdx;
+  // Standard resume: start at first unsolved puzzle (or Puzzle 1 if 0 attempts)
+  idx = currentIdx === -1 ? 0 : currentIdx;
   loadPuzzle();
 
   const currentPuzzleAttempts = attemptsByPuzzle[puzzles[idx].id] || [];
